@@ -4,7 +4,7 @@ function toBytes(value){
 }
 function toB64u(value){let s='';for(const b of new Uint8Array(value))s+=String.fromCharCode(b);return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
 function authActionUrl(base,action){const u=new URL(base);u.searchParams.set('action',action);return u.toString()}
-async function api(base,action,{body={},headers={}}={}){const r=await fetch(authActionUrl(base,action),{method:'POST',headers:{'Content-Type':'application/json',...headers},body:JSON.stringify(body)});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.error||`HTTP ${r.status}`);return data}
+async function api(base,action,{body={},headers={}}={}){let r;try{r=await fetch(authActionUrl(base,action),{method:'POST',headers:{'Content-Type':'application/json',...headers},body:JSON.stringify(body)})}catch{throw new Error('Сервер синхронизации недоступен. Проверь API URL и подключение Yandex Cloud.')}const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.error||`HTTP ${r.status}`);return data}
 export function passkeySupported(){return Boolean(window.PublicKeyCredential&&navigator.credentials?.create&&navigator.credentials?.get)}
 export async function registerPasskey(apiUrl,bootstrapToken){
   if(!passkeySupported())throw new Error('Passkey/WebAuthn не поддерживается этим браузером');
