@@ -5,7 +5,7 @@ async function idbGet(){const db=await openDb();return new Promise((resolve,reje
 async function idbPut(value){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(value,KEY);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error)})}
 async function idbDelete(){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).delete(KEY);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error)})}
 export async function vaultExists(){return Boolean(await idbGet())}
-export async function createVault(pin){const state={version:1,cases:[],followups:[],pending:[],settings:{apiUrl:'',apiToken:''},deviceId:crypto.randomUUID(),verificationBatches:[]};await saveVault(state,pin);return state}
+export async function createVault(pin){const state={version:1,cases:[],followups:[],pending:[],settings:{apiUrl:'https://functions.yandexcloud.net/d4e4l55o224tbo28mcsb',apiToken:''},deviceId:crypto.randomUUID(),verificationBatches:[]};await saveVault(state,pin);return state}
 export async function loadVault(pin){const env=await idbGet();if(!env)throw new Error('Vault not found');return decryptJson(env,pin)}
 export async function saveVault(state,pin){await idbPut(await encryptJson(state,pin))}
 export async function exportEnvelope(){return idbGet()}
