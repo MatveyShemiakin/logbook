@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, readFile, readdir } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+const execFileP=promisify(execFile);
+import { buildStatic } from '../tools/build-static.mjs';
+
+test('static builder creates five-file mobile deployment bundle with passkey code inlined',async()=>{
+  const out=await mkdtemp(path.join(tmpdir(),'logbook-static-'));
+  await buildStatic(out);
+  const files=(await readdir(out)).sort();
+  assert.deepEqual(files,['icon-192.png','icon-512.png','index.html','manifest.webmanifest','sw.js']);
+  const html=await readFile(path.join(out,'index.html'),'utf8');
+  assert.match(html,/navigator\.credentials\.create/);
+  assert.match(html,/importEnvelope/);
+  assert.equal((html.match(/<!doctype html>/g)||[]).length,1,'builder must not expand $ replacement tokens inside bundled JS');
+  assert.doesNotMatch(html,/src="\/app\.js"/);
+  assert.doesNotMatch(html,/href="\/styles\.css"/);
+  const script=(html.match(/<script type=\"module\">([\s\S]*)<\/script>/)||[])[1];
+  assert.ok(script);
+  const jsPath=path.join(out,'bundle.mjs');
+  await import('node:fs/promises').then(m=>m.writeFile(jsPath,script));
+  await execFileP(process.execPath,['--check',jsPath]);
+  const sw=await readFile(path.join(out,'sw.js'),'utf8');
+  assert.doesNotMatch(sw,/\/app\.js/);
+  assert.match(html,/serviceWorker\.register\('\.\/sw\.js'\)/);
+  assert.match(sw,/u\.href\.startsWith\(self\.registration\.scope\)/);
+});
