@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#173c31">
+<meta name="description" content="Private offline-first ophthalmic surgical logbook">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="stylesheet" href="/styles.css">
+<title>Surgical Logbook — Matvey Shemyakin</title>
+</head>
+<body>
+<div id="unlock" class="screen center-screen">
+  <div class="auth-card">
+    <div class="mark">МШ</div>
+    <p class="eyebrow">PRIVATE SURGICAL REGISTRY</p>
+    <h1>International Ophthalmic<br>Surgical Logbook</h1>
+    <p class="muted">Offline-first · encrypted local vault · YDB sync</p>
+    <div id="setupBlock" hidden>
+      <label>PIN (минимум 6 цифр; для restore — PIN из backup)</label>
+      <input id="newPin" inputmode="numeric" autocomplete="new-password" type="password" minlength="6" placeholder="••••••">
+      <button id="createVault" class="primary wide">Создать защищённый vault</button>
+      <div class="restore-box"><p class="muted">Переходишь с другого адреса? Восстанови encrypted backup.</p><input id="restoreFile" type="file" accept="application/json,.json"><button id="restoreVault" type="button" class="ghost wide">Восстановить backup</button></div>
+    </div>
+    <div id="unlockBlock" hidden>
+      <label>PIN</label>
+      <input id="pin" inputmode="numeric" autocomplete="current-password" type="password" placeholder="••••••">
+      <button id="unlockBtn" class="primary wide">Открыть logbook</button>
+    </div>
+    <p id="authError" class="error"></p>
+  </div>
+</div>
+
+<div id="app" hidden>
+<header class="topbar">
+  <div class="brand"><span class="brand-mark">МШ</span><div><strong>Surgical Logbook</strong><small>Matvey Shemyakin</small></div></div>
+  <div class="top-actions"><span id="netBadge" class="pill">offline</span><span id="syncBadge" class="pill">0 pending</span><button id="lockBtn" class="ghost small">Lock</button></div>
+</header>
+
+<div class="layout">
+<nav class="sidebar" aria-label="Навигация">
+  <button data-view="dashboard" class="nav-btn active">Обзор</button>
+  <button data-view="operation" class="nav-btn">+ Операция</button>
+  <button data-view="followup" class="nav-btn">+ Follow-up</button>
+  <button data-view="journal" class="nav-btn">Журнал</button>
+  <button data-view="exports" class="nav-btn">Экспорт</button>
+  <button data-view="settings" class="nav-btn">Настройки</button>
+</nav>
+<main class="content">
+<section id="view-dashboard" class="view active">
+  <div class="page-head"><div><p class="eyebrow">SURGICAL PORTFOLIO</p><h2>Обзор</h2></div><button class="primary" data-view-go="operation">+ Новая операция</button></div>
+  <div id="stats" class="stats"></div>
+  <div class="grid-2">
+    <article class="card"><h3>По направлениям</h3><div id="specialtyStats"></div></article>
+    <article class="card"><h3>Контроль качества</h3><div id="qualityStats"></div></article>
+  </div>
+  <article class="card"><h3>Последние операции</h3><div id="recentCases"></div></article>
+</section>
+
+<section id="view-operation" class="view">
+  <div class="page-head"><div><p class="eyebrow">QUICK ENTRY</p><h2>Операция</h2><p class="muted">Основные поля — до 60 секунд. Дополнительные открываются по специальности.</p></div></div>
+  <form id="caseForm">
+    <article class="card">
+      <div class="form-grid">
+        <div><label>Case ID</label><div class="inline"><input id="caseId" required><button type="button" id="regenId" class="ghost">↻</button></div></div>
+        <div><label>Дата операции</label><input type="date" id="surgeryDate" required></div>
+        <div><label>Учреждение / площадка</label><input id="site" placeholder="МГОЦ / Боткинская"></div>
+        <div><label>Глаз</label><select id="eye"><option>OD</option><option>OS</option><option>OU</option></select></div>
+        <div><label>Направление</label><select id="specialty" required><option value="">Выбрать…</option><option>Cataract</option><option>Cornea</option><option>Glaucoma</option><option>IOL fixation / dislocation</option><option>Vitreoretinal</option><option>Trauma</option><option>Combined</option><option>Other</option></select></div>
+        <div><label>Операция</label><input id="procedure" required placeholder="PPV / PKP / DALS / Phaco…"></div>
+        <div class="span-2"><label>Диагноз</label><input id="diagnosis" placeholder="Без ФИО и номера ИБ"></div>
+        <div><label>Сложность</label><select id="complexity"><option>Routine</option><option>Moderate</option><option>Complex</option><option>Very complex</option></select></div>
+        <div><label>Срочность</label><select id="caseType"><option>Elective</option><option>Urgent</option><option>Emergency</option></select></div>
+        <div><label>Роль</label><select id="role"><option>Primary surgeon — independent</option><option>Primary surgeon — supervised</option><option>Assistant</option><option>Supervisor</option></select></div>
+        <div><label>Статус</label><select id="status"><option>PRIVATE</option><option>RESEARCH</option><option>IP_HOLD</option><option>PUBLIC_READY</option></select></div>
+      </div>
+    </article>
+    <article id="specialtyCard" class="card" hidden><h3 id="specialtyTitle">Специальный модуль</h3><div id="specialtyFields" class="form-grid"></div></article>
+    <details class="card">
+      <summary>Расширенные данные</summary>
+      <div class="form-grid details-body">
+        <div><label>Pre-op BCVA</label><input id="preBcva"></div>
+        <div><label>Pre-op IOP, mmHg</label><input id="preIop" type="number" step="0.1"></div>
+        <div><label>Final / latest BCVA</label><input id="finalBcva"></div>
+        <div><label>Latest IOP, mmHg</label><input id="latestIop" type="number" step="0.1"></div>
+        <div class="span-2"><label>Предыдущие операции</label><input id="previousSurgery"></div>
+        <div class="span-2"><label>Факторы риска</label><textarea id="riskFactors"></textarea></div>
+        <div class="span-2"><label>Ключевая техника</label><textarea id="keyTechnique"></textarea></div>
+        <div><label>Интраоперационное осложнение</label><select id="intraComplication"><option>No</option><option>Yes</option></select></div>
+        <div><label>Послеоперационное осложнение</label><select id="postComplication"><option>No</option><option>Yes</option></select></div>
+        <div><label>Reintervention</label><select id="reintervention"><option>No</option><option>Yes</option></select></div>
+        <div><label>Media</label><select id="mediaAvailable"><option>No</option><option>Yes — encrypted SSD</option></select></div>
+        <div><label>Media Storage ID</label><input id="mediaStorageId" placeholder="обычно тот же Case ID"></div>
+        <div><label>Consent scientific</label><select id="consentScience"><option>Not recorded</option><option>Yes</option><option>No</option></select></div>
+        <div><label>Consent public education</label><select id="consentPublic"><option>Not recorded</option><option>Yes</option><option>No</option></select></div>
+        <div class="span-2"><label>Clinical pearl</label><textarea id="clinicalPearl"></textarea></div>
+      </div>
+    </details>
+    <div id="privacyWarning" class="warning" hidden></div>
+    <div class="action-row"><button type="submit" class="primary">Сохранить операцию</button><button type="button" id="resetCase" class="ghost">Очистить</button><span id="saveMessage" class="success"></span></div>
+  </form>
+</section>
+
+<section id="view-followup" class="view">
+  <div class="page-head"><div><p class="eyebrow">LONGITUDINAL OUTCOMES</p><h2>Follow-up</h2></div></div>
+  <form id="followForm" class="card">
+    <div class="form-grid">
+      <div class="span-2"><label>Case ID</label><select id="fuCaseId" required></select></div>
+      <div><label>Точка</label><select id="fuPoint"><option>POD1</option><option>Week 1</option><option>Month 1</option><option>Month 3</option><option>Month 6</option><option>Month 12</option><option>Other</option></select></div>
+      <div><label>Дата</label><input id="fuDate" type="date" required></div>
+      <div><label>BCVA</label><input id="fuBcva"></div><div><label>IOP</label><input id="fuIop" type="number" step="0.1"></div>
+      <div><label>Медикаменты, n</label><input id="fuMeds" type="number" min="0"></div><div><label>Refraction / SE</label><input id="fuRefraction"></div>
+      <div><label>Graft status</label><select id="fuGraft"><option></option><option>Clear</option><option>Rejection</option><option>Failure</option></select></div>
+      <div><label>IOL status</label><select id="fuIol"><option></option><option>Centered</option><option>Decentered</option><option>Re-dislocated</option></select></div>
+      <div><label>Retina</label><select id="fuRetina"><option></option><option>Attached — primary</option><option>Attached — after reoperation</option><option>Detached</option></select></div>
+      <div><label>Осложнение</label><select id="fuComp"><option>No</option><option>Yes</option></select></div>
+      <div><label>Reintervention</label><select id="fuReint"><option>No</option><option>Yes</option></select></div>
+      <div class="span-2"><label>Outcome summary</label><textarea id="fuOutcome"></textarea></div>
+      <div><label>Следующий контроль</label><input id="fuNext" type="date"></div>
+    </div>
+    <div class="action-row"><button class="primary">Сохранить follow-up</button><span id="fuMessage" class="success"></span></div>
+  </form>
+</section>
+
+<section id="view-journal" class="view">
+  <div class="page-head"><div><p class="eyebrow">CASE REGISTRY</p><h2>Журнал</h2></div></div>
+  <article class="card"><div class="toolbar"><input id="search" placeholder="Поиск Case ID / операции / диагноза"><select id="filterSpecialty"><option value="">Все направления</option><option>Cataract</option><option>Cornea</option><option>Glaucoma</option><option>IOL fixation / dislocation</option><option>Vitreoretinal</option><option>Trauma</option><option>Combined</option></select></div><div id="caseList"></div></article>
+</section>
+
+<section id="view-exports" class="view">
+  <div class="page-head"><div><p class="eyebrow">CREDENTIALING</p><h2>Экспорт и аудит</h2></div></div>
+  <div class="grid-2">
+    <article class="card"><h3>Полная резервная копия</h3><p class="muted">Зашифрованный vault и переносимый JSON.</p><div class="stack"><button id="exportEncrypted" class="primary">Encrypted vault</button><button id="exportJson" class="ghost">Pseudonymized JSON</button><button id="exportCsv" class="ghost">Cases CSV</button></div></article>
+    <article class="card"><h3>International summaries</h3><p class="muted">Подготовительные отчёты, не официальные формы организаций.</p><div class="stack"><button data-report="RANZCO" class="ghost reportBtn">RANZCO-style</button><button data-report="RCOphth" class="ghost reportBtn">RCOphth-style</button><button data-report="ACGME" class="ghost reportBtn">ACGME-style</button><button data-report="Cataract100" class="ghost reportBtn">Last 100 cataracts</button><button data-report="VR" class="ghost reportBtn">VR outcomes</button></div></article>
+  </div>
+  <article class="card"><h3>Verification batch</h3><p class="muted">Формирует пакет выбранного диапазона операций для последующего подтверждения руководителем/учреждением.</p><div class="inline"><input id="verifyFrom" type="date"><input id="verifyTo" type="date"><button id="makeVerification" class="primary">Сформировать пакет</button></div><pre id="verificationOutput" class="report"></pre></article>
+</section>
+
+<section id="view-settings" class="view">
+  <div class="page-head"><div><p class="eyebrow">SECURITY & SYNC</p><h2>Настройки</h2></div></div>
+  <article class="card"><h3>Cloud sync</h3><div class="security-line"><div><b id="passkeyStatus">Passkey не подключён</b><p class="muted">После подключения синхронизация использует короткую сессию после биометрии. Долгоживущий sync token можно удалить с устройства.</p></div><button id="enablePasskey" class="primary">Подключить passkey</button></div><div class="action-row"><button id="syncNow" class="ghost">Sync now</button><button id="reauthPasskey" class="ghost">Биометрия</button></div><p id="syncMessage" class="muted"></p><details class="details-body"><summary>Технические настройки / восстановление</summary><label>API URL</label><input id="apiUrl" placeholder="https://functions.yandexcloud.net/…"><label>Bootstrap sync token</label><input id="apiToken" type="password" autocomplete="off" placeholder="нужен только для первичной регистрации passkey"><div class="action-row"><button id="saveSettings" class="primary">Сохранить</button></div></details></article>
+  <article class="card"><h3>Конфликты синхронизации</h3><div id="conflictList"><p class="muted">Конфликтов нет.</p></div></article>
+  <article class="card"><h3>Локальная безопасность</h3><p>Vault шифруется AES-256-GCM. Ключ выводится из PIN через PBKDF2-SHA256 (210 000 итераций). PIN не отправляется в облако.</p><button id="backupReminder" class="ghost">Проверить backup</button></article>
+  <article class="card danger-card"><h3>Опасная зона</h3><p class="muted">Сначала сделай encrypted backup.</p><button id="wipeLocal" class="danger">Удалить локальный vault</button></article>
+</section>
+</main>
+</div>
+</div>
+<script type="module" src="/app.js"></script>
+</body>
+</html>
